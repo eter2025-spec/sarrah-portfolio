@@ -7,12 +7,11 @@
  const defs=make('defs');for(const [id,markup] of Object.entries(data.graphics)){const g=make('g',{id:'art'+id});g.innerHTML=markup;defs.appendChild(g);}svg.appendChild(defs);
  const stage=make('g');svg.appendChild(stage);host.replaceChildren(svg);
  let current=null,timer=0,raf=0,disposed=false,paused=false;
- const reduced=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
  function matrix(el,m){el.setAttribute('transform','matrix('+m.join(' ')+')');}
  function parts(m){return {x:m[4],y:m[5],r:Math.atan2(m[1],m[0]),sx:Math.hypot(m[0],m[1]),sy:(m[0]*m[3]-m[1]*m[2])/Math.hypot(m[0],m[1])};}
  function interpolate(a,b,t){a=parts(a);b=parts(b);let dr=b.r-a.r;while(dr>Math.PI)dr-=2*Math.PI;while(dr< -Math.PI)dr+=2*Math.PI;const r=a.r+dr*t,sx=a.sx+(b.sx-a.sx)*t,sy=a.sy+(b.sy-a.sy)*t;return [Math.cos(r)*sx,Math.sin(r)*sx,-Math.sin(r)*sy,Math.cos(r)*sy,a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t];}
  function ease(x){const bez=(t,a,b)=>3*(1-t)*(1-t)*t*a+3*(1-t)*t*t*b+t*t*t;let lo=0,hi=1;for(let i=0;i<22;i++){const mid=(lo+hi)/2;if(bez(mid,.3,.7)<x)lo=mid;else hi=mid;}return bez((lo+hi)/2,-.05,-.5);}
- function schedule(){clearTimeout(timer);if(disposed||paused||reduced||document.hidden)return;const index=data.sequence.indexOf(current.id);if(index>=0)timer=setTimeout(()=>show(data.sequence[(index+1)%6],true),data.delay);}
+ function schedule(){clearTimeout(timer);if(disposed||paused||document.hidden)return;const index=data.sequence.indexOf(current.id);if(index>=0)timer=setTimeout(()=>show(data.sequence[(index+1)%6],true),data.delay);}
  function show(id,animate=false){if(!pages.has(id)||disposed)return;clearTimeout(timer);cancelAnimationFrame(raf);const next=pages.get(id),previous=current;current=next;const oldMap=new Map((previous?.elements||[]).map(e=>[e.key,e]));stage.replaceChildren();const tweens=[];
   for(const e of next.elements){const g=make('g',{'aria-label':e.label});const old=oldMap.get(e.key);const from=animate&&old?old.matrix:e.matrix;matrix(g,from);g.setAttribute('opacity',e.opacity);const art=make('use',{href:'#art'+e.graphic});g.appendChild(art);
    let fading=null;if(animate&&old&&old.graphic!==e.graphic){fading=make('use',{href:'#art'+old.graphic});g.insertBefore(fading,art);art.setAttribute('opacity','0');}
@@ -20,7 +19,7 @@
    stage.appendChild(g);tweens.push({g,from,to:e.matrix,art,fading});
   }
   svg.setAttribute('data-page',id);
-  if(!animate||reduced){schedule();return;}
+  if(!animate){schedule();return;}
   let start=null;function tick(now){if(disposed)return;if(start===null)start=now;const raw=Math.min(1,(now-start)/data.duration),t=ease(raw);for(const v of tweens){matrix(v.g,interpolate(v.from,v.to,t));if(v.fading){v.fading.setAttribute('opacity',1-raw);v.art.setAttribute('opacity',raw);}}if(raw<1)raf=requestAnimationFrame(tick);else{for(const v of tweens){matrix(v.g,v.to);v.fading?.remove();}schedule();}}
   raf=requestAnimationFrame(tick);
  }
